@@ -1,0 +1,139 @@
+# Glossário
+
+Termos que aparecem neste projeto, com o significado **no contexto dele**.
+
+## Arquitetura
+
+| Termo | O que é |
+| --- | --- |
+| **Bounded context** | Pedaço de negócio com fronteira própria. Aqui: cada pasta em `modules/` |
+| **Camada** | Nível de responsabilidade: `schema` → `repository` → `services` → `ui` |
+| **ADR** | *Architecture Decision Record*. Um arquivo por decisão, com contexto e consequência |
+| **BFF** | *Backend For Frontend*. Backend que existe só para servir esta UI (as `route.ts`) |
+| **Adapter** | Troca a implementação sem mudar quem usa (local vs. GitHub em `core/db/adapters`) |
+| **Repository** | Camada que só lê/grava dados. Sem regra de negócio |
+| **Service** | Camada de regra de negócio. Sem React, sem `fs` |
+| **Stateless** | Sem estado próprio no servidor. Aqui: sem banco até um módulo exigir |
+| **Capability** | Capacidade de dados que um módulo declara precisar (`requiresCapabilities`) |
+
+## Next.js / React
+
+| Termo | O que é |
+| --- | --- |
+| **App Router** | Roteamento por pastas em `app/`. Arquivo = rota |
+| **Server Component** | Renderiza no servidor. Padrão no App Router. Pode ler arquivo e segredo |
+| **Client Component** | Renderiza no browser. Precisa de `"use client"`. Necessário para `useState`, `onClick` |
+| **Hydration** | Momento em que o React "assume" o HTML que veio do servidor |
+| **Route Handler** | `route.ts` — endpoint HTTP (GET, POST, PUT, DELETE) |
+| **Middleware** | Código que roda **antes** de toda requisição (`middleware.ts`) |
+| **SSR / SSG / ISR** | Render no servidor a cada request / na build / na build com revalidação |
+| **Slot / children** | Injetar conteúdo dentro de um componente (usado no editor da Fase 6) |
+| **AppShell / AppHeader** | Casca visual compartilhada em `core/ui` (marca, nav, ações). Ver ADR-0010 |
+| **`loading.tsx`** | Arquivo Next.js que mostra skeleton **enquanto** a rota carrega (melhora percepção no clique) |
+| **`React.cache()`** | Dedupe de função async **na mesma request** (layout + page não relê disco 2x) |
+| **Geist** | Fonte do portal (`geist` + CSS variables no `app/layout.tsx`) |
+| **lucide-react** | Biblioteca de ícones SVG usada na home, login e catálogo |
+| **Fuse.js** | Busca fuzzy client-side/server-side; índice montado em `build-search-index.ts` |
+| **CommandPalette** | Modal de busca global (`Ctrl+K`) em `core/ui/command-palette.tsx` |
+| **`permissions.json`** | RBAC externo em `data/` — admins/clients sem editar código (Fase B/9) |
+| **Compliance** | Módulo admin `/compliance` — catálogo de controles de proteção de dados |
+| **RBAC** | *Role-Based Access Control* — papéis `admin` e `client` por e-mail |
+| **CSP** | *Content Security Policy* — header que restringe scripts/recursos carregados |
+| **CSRF** | Ataque que força ação autenticada de outro site; mitigado com Origin + SameSite |
+| **SSRF** | Servidor acessa URL interna maliciosa; bloqueado em `gateway-url.ts` |
+
+## TypeScript
+
+| Termo | O que é |
+| --- | --- |
+| **Narrowing** | TS reduzir o tipo pelo fluxo do código (`if (!x) return` → depois `x` existe) |
+| **`z.infer`** | Extrair o tipo TS a partir de um schema Zod (uma fonte só de verdade) |
+| **Type guard** | Função que prova um tipo (`x is Foo`) |
+| **`unknown`** | "Não sei o tipo" — obriga validar antes de usar. Preferível a `any` |
+| **Generic** | Tipo parametrizado (`Array<string>`) |
+
+## Git
+
+| Termo | O que é |
+| --- | --- |
+| **Working directory** | Seus arquivos como estão agora |
+| **Staging / index** | Área do que vai entrar no próximo commit (`git add`) |
+| **Commit** | Ponto salvo no histórico, com mensagem |
+| **Branch** | Linha do tempo independente de commits |
+| **Remote / origin** | Repositório no servidor. `origin` = o padrão (GitHub) |
+| **Upstream** | Branch remota vinculada à sua local (`push -u`) |
+| **PR / Pull Request** | Pedido de revisão para juntar sua branch na `main` |
+| **Fetch** | Baixar o histórico do GitHub sem alterar a pasta de trabalho |
+| **Rebase** | Reaplicar seus commits em cima de outra branch, como se você tivesse começado depois dela |
+| **Merge** | Juntar duas linhas do tempo |
+| **Conflito** | Mesma linha mudou nos dois lados — você decide qual fica |
+| **Stash** | Gaveta temporária para trabalho pela metade |
+| **HEAD** | Onde você está agora. `HEAD~1` = um commit atrás |
+
+## Qualidade
+
+| Termo | O que é |
+| --- | --- |
+| **CI** | *Continuous Integration*. Aqui: `npm run ci` (typecheck→lint→arch→test→build) |
+| **Lint** | Análise estática de padrão de código (ESLint) |
+| **Typecheck** | Verificar tipos sem gerar arquivo (`tsc --noEmit`) |
+| **Teste unitário** | Testa uma função isolada (Vitest) |
+| **Teste E2E** | Testa o fluxo no navegador de verdade (Playwright) |
+| **Mock** | Substituto falso de uma dependência, para isolar o teste |
+| **Coverage** | % de código executado pelos testes |
+| **dependency-cruiser** | Ferramenta que verifica as regras de import (`npm run arch`) |
+
+## Domínio do Portal EDI
+
+| Termo | O que é |
+| --- | --- |
+| **Documentação viva** | Manual que acompanha o schema real da API, não um PDF parado |
+| **Gateway** | API GraphQL da Fidelize que o distribuidor consome |
+| **SSO** | *Single Sign-On*. Login corporativo que abre o portal |
+| **Rate limit** | Limite de tentativas numa janela de tempo. Login: 10 por e-mail e 30 por IP em 15 min (`core/auth/rate-limit.ts`) |
+| **Conta local de emergência** | Login alternativo para contingência do SSO, criado por script e guardado em env server-side com senha hash e MFA |
+| **MFA / TOTP** | Segundo fator por código de 6 dígitos gerado por app Authenticator com janela de tempo curta |
+| **Código de recuperação** | Código de uso único para entrar sem celular; depois de usado fica invalidado permanentemente |
+| **Enumeração de contas** | Descobrir quais e-mails existem pela diferença nas mensagens de erro. Por isso o login diz sempre "Credenciais inválidas" |
+| **Redis** | Banco de chave-valor em memória, compartilhado entre instâncias. Aqui guarda o contador de tentativas em homolog/produção |
+| **`aria-live`** | Atributo que faz o leitor de tela anunciar um texto quando ele muda (ex.: mensagem de erro do login) |
+| **`x-forwarded-for` / `x-real-ip`** | Cabeçalhos em que o proxy informa o IP real do cliente; só são confiáveis atrás de proxy próprio |
+| **Introspection** | Consulta que pede ao GraphQL o próprio schema |
+| **Allowlist** | Lista do que é permitido. Aqui: só operações do `manual.json` no playground |
+| **Manual / Roteiro** | Sequência ordenada de operações que o distribuidor deve seguir |
+| **Section** | Bloco Markdown de contexto (`sections/*.md`) |
+| **Operation** | Operação GraphQL documentada (`query` ou `mutation`) |
+| **Publish** | Tornar o manual visível ao distribuidor (`published: true`) |
+| **Quality check** | Validação que **bloqueia** publish se o manual estiver incompleto |
+| **Distribuidor** | Cliente externo que lê o manual |
+| **CMS em arquivos** | Conteúdo em `content/` no Git, sem banco (ADR-0009) |
+| **Seed-only** | Conteúdo de exemplo local para fluxo/tela, ainda sem paridade real com o legado |
+| **IntegrationFlow** | Diagrama BPMN curado em `flow.json` — nós (`start`, `operation`, `decision`, `end`) + arestas |
+| **React Flow** | Biblioteca `@xyflow/react` para canvas de nós/arestas no browser |
+| **Mermaid** | Linguagem texto → diagrama; export do fluxo via `exportFlowToMermaid` |
+| **Família de produto** | Agrupamento visual (EDI Pharma, EDI Varejo) no catálogo/admin — metadata em `config.json`, não muda rota nem credenciais |
+| **Editorial workflow** | Padrão de CMS git-backed (Decap, Sveltia, Tina): salvar na tela cria branch + PR; aprovar = merge. O PR **é** a fila de aprovação, sem banco |
+| **Fila de aprovação** | Tela prevista em `/admin/fila`: lista de alterações de conteúdo esperando o aval da qualidade — projeção dos PRs com label `conteudo:*` |
+| **Git Data API** | API do GitHub que monta blob → tree → commit → ref. Permite gravar vários arquivos em **um commit só** (a Contents API grava um por vez) |
+| **Versão do manual** | `manualVersion` semântico em `manual.json`, incrementado no merge; `versionHistory[]` guarda data, autor e resumo de cada aprovação |
+| **Radar de requisições** | Verificação semanal do gateway de cada subproduto: compara queries/mutations atuais com as já conhecidas e registra as novas, sem publicar nada. Plano em `docs/arquitetura/plano-branches-fila-e-radar.md` |
+| **Lista conhecida (baseline)** | Conjunto de requisições que o EDI já tinha quando o Radar começou. Só o que não está nela vira "nova" |
+| **Versão interna** | Registro de alteração que não impacta o distribuidor (texto, layout). Não muda o número do manual e só o EDI vê |
+| **`portal-state`** | Branch do GitHub prevista para guardar estado operacional (Radar, destinatários) sem banco e sem passar pela fila de conteúdo |
+| **Protocolo REST vs GraphQL no portal** | `config.protocol` (`"graphql"` \| `"rest"`) define como um projeto é lido: GraphQL usa `graphqlUrl`, playground e `exampleQuery`; REST usa `apiBaseUrl`, sem playground, e cada operação (`kind: "rest"`) tem `method`/`path`/`exampleBody` em vez de query. Toda a cadeia (schema, quality gate, exports, UI, admin) faz esse branch — ver `modules/living-docs-externa/schema/manual.ts` e `project.ts` |
+
+## Segurança
+
+| Termo | O que é |
+| --- | --- |
+| **SSRF** | Fazer o servidor chamar uma URL maliciosa. Bloqueado em `core/security/gateway-url.ts` |
+| **Rate limit** | Limitar tentativas. Login: 10 / 15 min |
+| **JWT** | Token assinado que carrega a sessão (8h, httpOnly aqui) |
+| **httpOnly** | Cookie que o JavaScript do browser **não** consegue ler |
+| **RBAC** | Controle de acesso por papel (`core/auth/roles`) |
+| **`module-access`** | Funções `canAccessModule` / `canAccessPath` — permitem rota conforme `access` do módulo |
+| **`UserRole`** | `admin` (EDI) ou `client` (distribuidor, default após SSO) |
+| **Porta única** | `/` = login (deslogado) ou hub (logado); `/login` redireciona para `/` |
+| **AES-256-GCM** | Cifra usada em `credentials.enc` |
+
+↩ [[00-PAINEL-ESTUDOS|Painel de estudos]]

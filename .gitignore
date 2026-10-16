@@ -1,0 +1,58 @@
+# dependências
+/node_modules
+
+# next
+/.next
+/.next-e2e*
+/out
+
+# produção
+/build
+
+# testes e análise de arquitetura
+/coverage
+architecture.dot
+/test-results
+/playwright-report
+/.tmp-vitest
+
+# ambiente (NUNCA commitar segredos)
+.env
+.env.local
+.env*.local
+
+# dados de operação / credenciais
+/data/**/credentials.enc
+/data/permissions.json
+/data/access/permissions.json
+/data/access/first-access.json
+/data/access/sso-config.json
+/data/access/local-account-state.json
+/data/access/audit-log.json
+
+# logs / SO
+*.log
+.DS_Store
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# obsidian — atalhos locais (junction); conteúdo real está em docs/ e content/
+/obsidian/docs
+/obsidian/produtos/*/sections
+# saídas geradas pelo sincronizador; a fonte de verdade permanece em docs/ e content/
+/obsidian/00-MAPA-PORTAL.md
+/obsidian/produtos/*/_index.md
+/obsidian/produtos/*/operations/
+
+# PROMPTS de trabalho, não versionados
+PROMPT_*.md
+
+# Local / daily pessoal — não versionar
+.cursor/rules/demanda-jira.mdc
+docs/operacao/daily-jira.md
+obsidian/notas/estudos/diario/2026-10-08.md
+
+# PDFS de trabalho, não versionados
+*.pdf

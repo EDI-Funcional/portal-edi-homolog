@@ -1,0 +1,68 @@
+{
+  "name": "portal-integracao",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Portal de Integração modular do time EDI/Tecnologia — documentação viva, homologação e automações com IA.",
+  "engines": {
+    "node": "24.x"
+  },
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "dev:e2e": "next dev -p 3003",
+    "codegraph:sync": "codegraph sync .",
+    "codegraph:check": "codegraph status .",
+    "build": "next build",
+    "start": "next start -p 3002",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --config config/vitest.config.ts",
+    "test:watch": "vitest --config config/vitest.config.ts",
+    "test:coverage": "vitest run --coverage --config config/vitest.config.ts",
+    "test:e2e": "playwright test --config=playwright.config.ts",
+    "test:e2e:headed": "playwright test --config=playwright.config.ts --headed",
+    "arch": "depcruise app core modules --config config/dependency-cruiser.cjs",
+    "arch:graph": "depcruise app core modules --config config/dependency-cruiser.cjs --output-type dot > architecture.dot",
+    "migrate:legacy-content": "node scripts/run-tsx.cjs scripts/migrate-content-from-legacy.ts",
+    "content:validate-published": "node scripts/run-tsx.cjs scripts/validate-published-projects.ts",
+    "smoke:homolog": "node scripts/run-tsx.cjs scripts/smoke-homolog-checklist.ts",
+    "obsidian:sync": "node scripts/run-tsx.cjs scripts/sync-obsidian-vault.ts",
+    "obsidian:watch": "node scripts/run-tsx.cjs scripts/watch-obsidian-vault.ts",
+    "ci": "npm run typecheck && npm run lint && npm run arch && npm run test && npm run build"
+  },
+  "dependencies": {
+    "@octokit/rest": "^22.0.1",
+    "@xyflow/react": "^12.11.2",
+    "fuse.js": "^7.5.0",
+    "geist": "^1.7.2",
+    "graphql": "^16.14.2",
+    "lucide-react": "^1.28.0",
+    "next": "15.5.26",
+    "next-auth": "^5.0.0-beta.32",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "react-markdown": "^10.1.0",
+    "server-only": "^0.0.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "20.17.6",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "^19.2.3",
+    "@vitest/coverage-v8": "^4.1.11",
+    "autoprefixer": "^10.4.21",
+    "dependency-cruiser": "^17.4.3",
+    "eslint": "^8.57.1",
+    "eslint-config-next": "15.5.26",
+    "postcss": "^8.5.3",
+    "tailwindcss": "^3.4.17",
+    "tsx": "^4.19.3",
+    "typescript": "5.8.2",
+    "vitest": "^4.1.11"
+  },
+  "overrides": {
+    "next": {
+      "postcss": "8.5.23"
+    }
+  }
+}

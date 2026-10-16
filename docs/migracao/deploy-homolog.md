@@ -1,0 +1,80 @@
+# Deploy homolog — Portal de Integração
+
+Guia mínimo para subir o portal em ambiente de homologação.
+
+## Pré-requisitos
+
+- Node **24.x** ou Docker
+- Variáveis em `.env.local` (copie de `.env.example`)
+
+| Variável | Obrigatória | Para quê |
+|----------|-------------|----------|
+| `AUTH_SECRET` | Sim | Sessão JWT + criptografia de credenciais gateway |
+| `AUTH_URL` | Sim | URL pública do portal (ex.: `https://portal-homolog...`) |
+| `FUNCIONAL_SSO_GRAPHQL_URL` | Sim (homolog) | Login SSO distribuidor/admin |
+| `GITHUB_REPO_*` + `GITHUB_TOKEN` | Opcional | CMS remoto (senão usa `content/` local na imagem) |
+| `GITHUB_CONTENT_REF` | Recomendável com CMS remoto | Branch/tag/SHA do conteúdo usado pelo deploy |
+
+## RBAC (Fase B)
+
+O login lê os papéis **só** da variável `PERMISSIONS_CONFIG_JSON` (o middleware roda em edge e não lê arquivos).
+Use `data/permissions.example.json` como molde e cole o JSON numa linha só:
+
+```bash
+PERMISSIONS_CONFIG_JSON={"admins":["admin@empresa.com"],"editors":["operador@empresa.com"],"clients":["@distribuidor.com"],"defaultRole":"client"}
+```
+
+Mudança de papel exige novo login (o papel fica na sessão JWT por até 8h).
+
+## Node direto
+
+```bash
+npm ci
+npm run build
+npm run start    # porta 3002
+```
+
+### Vercel
+
+O `package.json` fixa o runtime em Node **24.x**. No projeto Vercel, mantenha também
+**Settings → Build and Deployment → Node.js Version** em **24.x** para alinhar a
+configuração do projeto aos builds desta branch. Depois de alterar a versão, gere um
+novo deploy da branch `edi-14321`; um deploy existente não muda retroativamente.
+
+## Docker
+
+```bash
+docker build -t portal-integracao .
+docker run -p 3002:3002 --env-file .env.local portal-integracao
+```
+
+Para alterar RBAC, edite `PERMISSIONS_CONFIG_JSON` no `--env-file` e reinicie o container.
+
+## Smoke pós-deploy
+
+```bash
+curl -s http://localhost:3002/api/health | jq
+npm run smoke:homolog
+```
+
+Checklist manual SSO: [`fase-5-smoke-sso-homolog.md`](./fase-5-smoke-sso-homolog.md).
+
+CMS GitHub em staging: [`github-cms-staging.md`](./github-cms-staging.md).
+
+Com CMS remoto, publique o código e o conteúdo na mesma referência. Para
+homolog, use `GITHUB_CONTENT_REF=homolog` quando essa branch existir no
+repositório CMS. Após alterar a variável na Vercel, faça novo deploy e valide a
+página do Canal Autorizador; sem a referência explícita, um preview pode ler a
+`main` do CMS e misturar conteúdo antigo com código novo.
+
+## Health check
+
+`GET /api/health` retorna:
+
+- `status`: `ok` ou `degraded` (problemas de env)
+- `content.backend`: `local` | `github`
+- `rbac.permissionsSource`: `file` | `default`
+- `summary`: contagem de módulos ativos vs bloqueados
+- `blockedModules`: módulos que exigem banco (homologação, IA)
+
+Use como probe de readiness em Kubernetes/load balancer.

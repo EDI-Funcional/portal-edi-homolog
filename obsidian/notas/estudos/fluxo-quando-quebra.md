@@ -1,0 +1,153 @@
+# Quando algo quebra — como investigar
+
+Método: **ler o erro → isolar a camada → reproduzir → corrigir → provar com teste.**
+
+Não chute. Ler a mensagem inteira resolve a maioria dos casos.
+
+## `npm run ci` falhou — qual etapa?
+
+O `ci` roda em ordem e **para na primeira falha**. A etapa que falhou já diz o tipo do
+problema:
+
+| Falhou em | Significa | Onde olhar |
+| --- | --- | --- |
+| `typecheck` | Tipo errado ou faltando | O arquivo e a linha no erro do `tsc` |
+| `lint` | Padrão de código | `npm run lint` mostra regra e linha |
+| `arch` | **Violou a arquitetura** | Import proibido — ver [[fluxo-novo-modulo#As 3 regras que mais quebram o CI]] |
+| `test` | Comportamento mudou | Nome do teste que falhou |
+| `build` | Erro só em produção | Server/client component, env faltando |
+| `arch` com `sem-ciclos` | Dependência circular entre camadas | Quebre o ciclo movendo leitura de `env` para função local simples ou extraindo contrato sem importar módulo pesado |
+
+Rode a etapa isolada para iterar rápido:
+
+```powershell
+npm run typecheck
+npm run arch
+npm run test
+```
+
+## Erros de tipo (TypeScript)
+
+Leia de **baixo para cima**: a última linha geralmente tem a causa raiz.
+
+| Mensagem | Causa comum | Correção |
+| --- | --- | --- |
+| `Property 'x' does not exist on type` | Campo não existe no tipo | Adicione no schema Zod ou corrija o nome |
+| `Type 'undefined' is not assignable` | Valor pode ser nulo | Trate o caso: `if (!x) return` ou `x ?? padrão` |
+| `Cannot find module '@/...'` | Caminho errado ou arquivo inexistente | Confira o path e o `tsconfig.json` |
+
+## Testes falhando
+
+```powershell
+npm run test:watch                       # re-roda ao salvar
+npx vitest run --config config/vitest.config.ts caminho/do/arquivo.test.ts
+```
+
+Leia o diff `expected` vs. `received` do Vitest. Duas possibilidades:
+
+1. O **código** está errado → corrija o código
+2. O **comportamento mudou de propósito** → atualize o teste (e explique no commit)
+
+Nunca "conserte" apagando a assertion.
+
+## Servidor não sobe
+
+| Sintoma | Causa | Solução |
+| --- | --- | --- |
+| `Port 3002 is already in use` | Já tem um dev server rodando | Ver [[comandos-terminal-windows#Processos e portas]] |
+| `Module not found` | Dependência não instalada | `npm install` |
+| Erro em `core/config` | Variável de ambiente faltando | Preencher `.env.local` (`AUTH_SECRET`) |
+| Comportamento antigo persistindo | Cache do Next | `Remove-Item -Recurse -Force .next` |
+
+## Navegação lenta no `npm run dev`
+
+| Sintoma | Causa | O que fazer |
+| --- | --- | --- |
+| **Primeiro** clique numa rota demora 10–15 s | Next compila a rota na hora (só em dev) | Normal — clique de novo fica rápido; em prod use `npm run build` + `start` |
+| Tela “congelada” no clique | Sem `loading.tsx` | Skeleton em `app/manual/loading.tsx` (já no projeto) |
+| Mesma rota ainda lenta na 2ª vez | Leitura duplicada de CMS | Services com `React.cache()` + passar `project` pro shell |
+
+## `npm run ci` / build estranho
+
+| Sintoma | Causa | Solução |
+| --- | --- | --- |
+| `Invalid project directory ...\na` | Texto extra no comando (`npm run ci na fase-...`) | Rode só `npm run ci` — a branch é contexto, não argumento |
+| `EPERM: ... .next\trace` | `npm run build`/`ci` com `npm run dev` na **mesma** pasta | `Ctrl+C` no dev → rode o CI → suba o dev de novo |
+| Dois `npm run dev` na mesma pasta | Porta 3002 + pasta `.next/` disputadas | Só **um** processo Next por pasta do projeto |
+
+## Erros de Next.js (App Router)
+
+| Mensagem | Causa | Correção |
+| --- | --- | --- |
+| `You're importing a component that needs useState...` | Componente interativo sem `"use client"` | Adicione `"use client"` na primeira linha |
+| `Hydration failed` | HTML do servidor ≠ do cliente | Evite `Date.now()`/`Math.random()` no render |
+| `Dynamic server usage` | Rota estática usando `cookies()`/`headers()` | Marque a rota como dinâmica |
+
+## Login não funciona em local
+
+1. `AUTH_SECRET` preenchido no `.env.local`?
+2. `DEV_AUTH_ENABLED=true` (só em `NODE_ENV=development`)?
+3. `FUNCIONAL_SSO_GRAPHQL_URL` vazia? Com ela preenchida o login dev **some** (tela e servidor) — só entra por e-mail e senha do SSO.
+4. Bateu no limite? São **10 tentativas por e-mail e 30 por IP, a cada 15 min** (ADR-0007) — espere ou reinicie o server (sem Redis o contador fica na memória do processo).
+5. A tela diz só "Credenciais inválidas"? É proposital: senha errada, e-mail inexistente e conta bloqueada têm a mesma mensagem.
+
+## Teste E2E falhou — a culpa é da minha mudança?
+
+Rode o **mesmo** teste sem as suas alterações e compare:
+
+```powershell
+git stash push -m "tmp" -- app/login/login-form.tsx core/auth/sso.ts   # guarda só estes arquivos
+npx playwright test --config=playwright.config.ts tests/e2e/portal-introduction.spec.ts -g "client uses"
+git stash pop                                                          # devolve os arquivos
+```
+
+Falhou igual sem a sua mudança = falha que já existia (ex.: o produto "IM" não existe no conteúdo local). Depois do E2E, confira `git status`: o Next
+pode ter mexido em `tsconfig.json` sozinho (`git restore tsconfig.json` desfaz).
+
+## `nvm use` — version not installed
+
+| Sintoma | Causa | Solução |
+| --- | --- | --- |
+| `activation error: Version not installed` | O número digitado não é o que foi instalado | `nvm list` e use o número exato, ex.: `nvm use 24.21.0` |
+
+O `24` do `nvm install 24` vira uma versão completa (aqui, `24.21.0`).
+`24.11.0` não existe nesta máquina.
+
+## `node:fs/promises` no middleware
+
+| Sintoma | Causa | Solução |
+| --- | --- | --- |
+| Tela "Build Error" ao abrir `localhost:3002`: `Reading from "node:fs/promises" is not handled` | O middleware importava o login completo, e o login lia a lista de acessos no disco | O middleware usa `core/auth/edge-config.ts`, que só lê o JWT. A lista continua em `core/auth/config.ts`, no servidor |
+
+## Teste do GitHub leu a branch errada
+
+| Sintoma | Causa | Solução |
+| --- | --- | --- |
+| `lê com ref (branch ou SHA) quando informado` espera `ref: "edi-1"` e a chamada sai sem branch | `getGithubContent` recebia a branch e, na linha seguinte, criava outra variável com o mesmo nome a partir da configuração | A branch da chamada vale primeiro; a da configuração só entra quando a chamada não informa nenhuma |
+
+## Git travado
+
+| Sintoma | Solução |
+| --- | --- |
+| `cannot rebase: You have unstaged changes` | Ainda há arquivo editado fora do commit. `git status` mostra qual. Guarde com `git stash -u`, rode o rebase e devolva com `git stash pop` |
+| Não consigo trocar de branch | `git stash` — ver [[fluxo-branches#Guardar trabalho pela metade (stash)]] |
+| `push` rejeitado | `git pull` e resolver, depois `git push` |
+| Conflito de merge | Abra o arquivo, escolha a versão, `git add .`, `git commit` |
+| Commitei algo errado (sem push) | `git reset --soft HEAD~1` |
+
+## Obsidian não atualiza
+
+1. O `npm run obsidian:watch` está rodando?
+2. Se não: `npm run obsidian:sync` atualiza de uma vez
+3. Nota gerada com conteúdo errado? Corrija a **origem** (`content/`, `docs/`), não a nota
+
+## Quando pedir ajuda ao agente
+
+Traga estas 4 coisas — respostas ficam muito melhores:
+
+1. O comando que rodou
+2. A mensagem de erro **completa** (não resumida)
+3. O que você esperava que acontecesse
+4. O que já tentou
+
+↩ [[00-PAINEL-ESTUDOS|Painel de estudos]]

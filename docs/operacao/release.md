@@ -1,0 +1,216 @@
+# Fluxo operacional de release
+
+Este guia descreve o caminho que deve seguir depois dos testes
+internos, antes de publicar uma mudanca via GitHub. Ele vale para correcoes de
+teste automatizado, conteudo, frontend e servicos do portal.
+
+## Principios
+
+- Trabalhe sempre em uma branch de tarefa, nunca direto na `main`.
+- Rode as validacoes antes de fazer commit.
+- Use `git add` com arquivos explicitos, evitando levar alteracoes fora do
+  escopo.
+- So abra PR quando a branch estiver limpa, com commit claro e validacoes
+  registradas.
+- Se uma validacao falhar, corrija, rode novamente e so entao faca commit/push.
+
+## Validacoes locais
+
+Rode primeiro o gate principal do projeto:
+
+```bash
+npm run ci
+```
+
+Esse comando executa, nesta ordem:
+
+| Etapa | Script | O que valida |
+| --- | --- | --- |
+| Tipos | `npm run typecheck` | Contratos TypeScript |
+| Lint | `npm run lint` | Padrao de codigo |
+| Arquitetura | `npm run arch` | Regra `app -> modules -> core`, modulos isolados e sem ciclos |
+| Testes | `npm run test` | Testes automatizados com Vitest |
+| Build | `npm run build` | Build de producao do Next.js |
+
+Para mudancas em manuais, schemas, catalogo, conteudo publicado ou fixtures de
+produto, rode tambem:
+
+```bash
+npm run content:validate-published
+```
+
+Para mudancas que afetam navegacao, telas, autenticacao, playground ou fluxo
+completo do usuario, rode:
+
+```bash
+npm run test:e2e
+```
+
+Observacao: o E2E usa Playwright com Microsoft Edge. Se o ambiente local nao
+tiver o navegador instalado, instale com `npx playwright install msedge` ou
+registre no PR que o E2E local nao foi executado por limitacao de ambiente.
+
+O portal local usa a porta `3002`; o E2E inicia uma instância isolada na porta
+`3003` (ou na porta definida por `E2E_PORT`) e usa um diretório Next exclusivo
+por execução. Não interrompa o portal local para executar os testes.
+
+Para deploy/homologacao, apos a aplicacao estar rodando no ambiente correto,
+rode:
+
+```bash
+npm run smoke:homolog
+```
+
+## Fluxo Git
+
+Antes do stage:
+
+```bash
+git status -sb
+git diff --check
+```
+
+Confira o diff:
+
+```bash
+git diff
+```
+
+Adicione apenas os arquivos da mudanca:
+
+```bash
+git add caminho/do/arquivo.ts caminho/do/teste.test.ts
+```
+
+Crie um commit com mensagem objetiva:
+
+```bash
+git commit -m "test: ajusta cenarios de schema do wholesaler"
+```
+
+Use prefixos consistentes:
+
+| Prefixo | Quando usar |
+| --- | --- |
+| `fix:` | Correcao de bug de produto |
+| `test:` | Ajuste/adicao de testes |
+| `feat:` | Nova funcionalidade |
+| `docs:` | Documentacao |
+| `refactor:` | Reorganizacao sem mudar comportamento |
+| `chore:` | Manutencao, tooling ou tarefa operacional |
+
+Publique a branch:
+
+```bash
+git push -u origin nome-da-branch
+```
+
+Se a branch ja tiver upstream:
+
+```bash
+git push
+```
+
+## Pull request e release no GitHub
+
+1. Abra PR da branch para `main`.
+2. No corpo do PR, liste:
+   - objetivo da mudanca;
+   - arquivos/areas impactadas;
+   - validacoes executadas;
+   - validacoes nao executadas e motivo, se houver.
+3. Aguarde o workflow **CI** do GitHub ficar verde.
+4. Peca revisao quando a mudanca nao for trivial.
+5. Depois do merge, acompanhe o workflow em `main`.
+6. Se o time estiver usando GitHub Releases/tags, crie a release apontando para
+   o commit mergeado em `main` e use as notas do PR como base.
+
+Atualmente nao ha script `release` no `package.json` nem workflow dedicado de
+publicacao. Portanto, o criterio minimo de release e: PR aprovado, CI verde e
+merge na `main`. Qualquer tag/release formal deve ser criada no GitHub conforme
+o procedimento do time.
+
+## Deploy no Vercel
+
+O deploy automatico via Git (preview por push, preview por PR, deploy ao
+fechar PR) esta **desativado de proposito**. O projeto define isso em
+`vercel.json`, na raiz:
+
+```json
+{
+  "git": {
+    "deploymentEnabled": false
+  }
+}
+```
+
+Motivo: evitar previews desnecessarios a cada push/PR, que consomem minutos de
+build e poluem os checks do PR sem necessidade real na maior parte das
+mudancas.
+
+Com isso, PR aprovado e CI verde na `main` (secao anterior) **nao** disparam
+deploy sozinhos. O deploy so acontece quando alguem decide de proposito,
+atraves de um dos caminhos abaixo.
+
+### Deploy manual via CLI
+
+```bash
+vercel deploy       # gera um preview a partir do estado atual da branch
+vercel --prod        # deploy de producao
+```
+
+Requer estar logado na CLI (`vercel login`) e o projeto vinculado
+(`vercel link`), uma vez por maquina.
+
+### Deploy manual via dashboard
+
+No [dashboard do projeto na Vercel](https://vercel.com/funcional-edi/portal-edi),
+use o botao **Redeploy** em cima de um deployment anterior, ou **Create
+Deployment** apontando para a branch desejada.
+
+### Quando disparar
+
+- Depois do merge na `main`, se a mudanca precisar estar visivel em
+  producao/preview para validacao externa.
+- Antes de compartilhar um link de preview com alguem fora do time (QA,
+  stakeholder), para revisar uma branch especifica.
+- Nao e necessario disparar deploy so porque um PR foi aberto ou fechado.
+
+## Modelo de descricao do PR
+
+```md
+## Objetivo
+
+Corrige os testes automatizados do schema publicado do Wholesaler.
+
+## Mudancas
+
+- Atualiza o Wholesaler para ser tratado como produto com snapshot publicado.
+- Mantem cobertura para produto publicado sem snapshot via fixture dedicada.
+- Ajusta indice de busca para validar a indexacao do Wholesaler.
+
+## Validacoes
+
+- [x] npm run ci
+- [x] npm run content:validate-published
+- [ ] npm run test:e2e - nao executado: ambiente local sem Microsoft Edge/fora do escopo
+
+## Risco
+
+Baixo. Mudanca restrita a testes automatizados e fixtures temporarias de teste.
+```
+
+## Checklist rapido
+
+- [ ] Branch atualizada e fora da `main`.
+- [ ] `npm run ci` passou.
+- [ ] `npm run content:validate-published` passou quando envolver conteudo/schema.
+- [ ] `npm run test:e2e` executado ou justificativa registrada.
+- [ ] `git diff --check` sem erros.
+- [ ] `git add` feito somente com arquivos da mudanca.
+- [ ] Commit com mensagem objetiva.
+- [ ] Push realizado.
+- [ ] PR aberto para `main`.
+- [ ] CI do GitHub verde antes de merge/release.
+- [ ] Deploy manual disparado (CLI ou dashboard), se a mudanca precisar estar
+      visivel em producao/preview agora.

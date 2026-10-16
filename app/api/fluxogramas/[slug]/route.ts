@@ -1,0 +1,76 @@
+import { NextResponse } from "next/server";
+
+import { auth, isAdminRole } from "@/core/auth";
+import { requireAdmin, resolveCurrentSessionRole } from "@/core/auth/require-role";
+import { GetFlowError, getProjectFlow } from "@/modules/fluxogramas/services/get-flow";
+import { SaveFlowError, saveProjectFlow } from "@/modules/fluxogramas/services/save-flow";
+
+const GET_STATUS: Record<GetFlowError["code"], number> = {
+  PROJECT_NOT_FOUND: 404,
+  FLOW_NOT_FOUND: 404,
+  NOT_PUBLISHED: 404,
+};
+
+const PUT_STATUS: Record<SaveFlowError["code"], number> = {
+  PROJECT_NOT_FOUND: 404,
+  VALIDATION: 400,
+  FLOW_INVALID: 422,
+};
+
+interface RouteParams {
+  params: Promise<{ slug: string }>;
+}
+
+/** Obtém fluxo salvo. Distribuidor só vê projetos publicados. */
+export async function GET(_request: Request, { params }: RouteParams) {
+  const session = await auth();
+  const role = await resolveCurrentSessionRole(session);
+  if (!role) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
+  const { slug } = await params;
+  const isAdmin = isAdminRole(role);
+  const flowId = new URL(_request.url).searchParams.get("fluxo") ?? undefined;
+
+  try {
+    const flow = await getProjectFlow(slug, { requirePublished: !isAdmin, flowId });
+    return NextResponse.json(flow);
+  } catch (error) {
+    if (error instanceof GetFlowError) {
+      return NextResponse.json({ error: error.message }, { status: GET_STATUS[error.code] });
+    }
+    throw error;
+  }
+}
+
+/** Persiste fluxo curado (somente admin). */
+export async function PUT(request: Request, { params }: RouteParams) {
+  const session = await requireAdmin();
+  if (!session) {
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+  }
+
+  const { slug } = await params;
+  const flowId = new URL(request.url).searchParams.get("fluxo") ?? undefined;
+
+  let body: unknown;
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: "JSON inválido." }, { status: 400 });
+  }
+
+  try {
+    const flow = await saveProjectFlow(slug, body, flowId);
+    return NextResponse.json(flow);
+  } catch (error) {
+    if (error instanceof SaveFlowError) {
+      return NextResponse.json(
+        { error: error.message, details: error.details },
+        { status: PUT_STATUS[error.code] }
+      );
+    }
+    throw error;
+  }
+}
